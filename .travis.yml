@@ -1,13 +1,12 @@
-dist: bionic
-sudo: false
+dist: focal
 
 language: java
 jdk:
-  - oraclejdk13
-  - openjdk13
+  - openjdk11
 
-services:
-  - mongodb
+# No `services: mongodb` — the test suite starts its own embedded MongoDB on
+# port 27017 via the com.sourcemuse.mongo Gradle plugin; a system mongod would
+# conflict on that port.
 
 install: ./gradlew assemble
 

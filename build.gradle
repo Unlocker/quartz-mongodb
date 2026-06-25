@@ -1,21 +1,20 @@
 buildscript {
     repositories {
         mavenCentral()
-        jcenter()
     }
 }
 
 plugins {
     id 'net.researchgate.release' version '2.8.1'
-    id "com.jfrog.bintray" version "1.8.5"
     id 'com.sourcemuse.mongo' version '1.0.7'
 }
 
 allprojects {
 	repositories {
-		jcenter()
+		mavenCentral()
 	}
 	apply plugin: 'maven-publish'
+	apply plugin: 'signing'
 	apply plugin: 'java'
 }
 
@@ -117,16 +116,83 @@ artifacts {
 publishing {
     publications {
         quartzMongoDB(MavenPublication) {
-            groupId    = 'com.novemberain'
+            groupId    = 'io.github.unlocker'
             artifactId = archivesBaseName
             version    = projectVersion
+
+            from components.java
 
             artifact sourceJar {
                 classifier "sources"
             }
 
-            from components.java
+            artifact javadocJar {
+                classifier "javadoc"
+            }
+
+            pom {
+                name = 'quartz-mongodb'
+                description = 'A MongoDB-backed job store for the Quartz scheduler'
+                url = 'https://github.com/Unlocker/quartz-mongodb'
+
+                licenses {
+                    license {
+                        name = 'The Apache License, Version 2.0'
+                        url = 'https://www.apache.org/licenses/LICENSE-2.0.txt'
+                    }
+                }
+
+                developers {
+                    developer {
+                        id = 'unlocker'
+                        name = 'Unlocker'
+                        url = 'https://github.com/Unlocker'
+                    }
+                }
+
+                scm {
+                    connection = 'scm:git:https://github.com/Unlocker/quartz-mongodb.git'
+                    developerConnection = 'scm:git:ssh://git@github.com/Unlocker/quartz-mongodb.git'
+                    url = 'https://github.com/Unlocker/quartz-mongodb'
+                }
+            }
         }
+    }
+
+    repositories {
+        // Local staging repository used to assemble a Central Portal upload bundle.
+        maven {
+            name = 'centralBundle'
+            url = "${buildDir}/central-bundle-repo"
+        }
+    }
+}
+
+signing {
+    def signingKey = findProperty('signingKey') ?: System.getenv('SIGNING_KEY')
+    def signingPassword = findProperty('signingPassword') ?: System.getenv('SIGNING_PASSWORD')
+    if (signingKey) {
+        useInMemoryPgpKeys(signingKey, signingPassword)
+    }
+    // Only require signatures when actually publishing a release with a key present,
+    // so that a plain `./gradlew build` works without a configured PGP key.
+    required {
+        signingKey != null &&
+            gradle.taskGraph.allTasks.any { it.name.startsWith('publish') || it.name == 'centralBundle' }
+    }
+    sign publishing.publications.quartzMongoDB
+}
+
+// Packages the signed artifacts into a single zip with the Maven repository
+// layout expected by the Central Portal "Publish Component" upload.
+// Produces build/distributions/central-bundle-<version>.zip
+task centralBundle(type: Zip) {
+    dependsOn 'publishQuartzMongoDBPublicationToCentralBundleRepository'
+    archiveFileName = "central-bundle-${projectVersion}.zip"
+    destinationDirectory = file("${buildDir}/distributions")
+    from("${buildDir}/central-bundle-repo") {
+        // The Portal rejects maven-metadata files in an upload bundle.
+        exclude '**/maven-metadata.xml*'
     }
 }
 
@@ -154,25 +220,5 @@ tasks.withType(Test){
         port 27017
         logging 'console'
         mongoVersion 'PRODUCTION'
-    }
-}
-
-bintray {
-    user = System.getenv("BINTRAY_USERNAME")
-    key  = System.getenv("BINTRAY_API_KEY")
-    publications = ['quartzMongoDB']
-    pkg {
-        repo = 'maven'
-        name = 'quartz-mongodb'
-        labels = ['quartz', 'mongodb']
-        userOrg = 'michaelklishin'
-        licenses = ['Apache-2.0']
-        vcsUrl = 'https://github.com/michaelklishin/quartz-mongodb.git'
-
-        version {
-            name = projectVersion
-            desc = 'MongoDB-backed job store for the Quartz scheduler'
-			vcsTag = projectVersion
-        }
     }
 }

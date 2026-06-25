@@ -13,30 +13,16 @@ This is a MongoDB-backed job store for the [Quartz scheduler](http://quartz-sche
 
 ## Maven Artifacts
 
-Artifacts are released to [Bintray](https://bintray.com/michaelklishin/maven/).
+Artifacts are released to [Maven Central](https://central.sonatype.com/artifact/io.github.unlocker/quartz-mongodb)
+under the `io.github.unlocker` group id. Maven Central is enabled by default,
+so no extra repository definition is required.
 
-If you are using Maven, add the following repository
-definition to your `pom.xml`:
-
-``` xml
-<repositories>
-    <repository>
-        <id>jcenter</id>
-        <url>https://jcenter.bintray.com/</url>
-    </repository>
-</repositories>
-```
-
-With Gradle, add the following to your `build.gradle`:
-
-``` groovy
-repositories {
-    maven {
-        url "https://jcenter.bintray.com/"
-    }
-}
-```
-
+> **Group id change:** versions **up to and including 2.1.0** were published under
+> the `com.novemberain` group id (originally via Bintray/jCenter, both now shut
+> down). Starting with **2.1.1** the artifacts are published to Maven Central under
+> the new `io.github.unlocker` group id. Update your dependency coordinates
+> accordingly when upgrading. The Java package names (`com.novemberain.quartz.mongodb.*`)
+> are unchanged.
 
 ### The Most Recent Release
 
@@ -44,16 +30,16 @@ With Maven:
 
 ``` xml
 <dependency>
-    <groupId>com.novemberain</groupId>
+    <groupId>io.github.unlocker</groupId>
     <artifactId>quartz-mongodb</artifactId>
-    <version>2.2.0-rc2</version>
+    <version>2.1.1</version>
 </dependency>
 ```
 
 With Gradle:
 
 ``` groovy
-compile "com.novemberain:quartz-mongodb:2.2.0-rc2"
+implementation "io.github.unlocker:quartz-mongodb:2.1.1"
 ```
 
 
@@ -176,6 +162,56 @@ org.quartz.jobStore.mongoOptionWriteConcernTimeoutMillis=10000
 [![Build Status](https://secure.travis-ci.org/michaelklishin/quartz-mongodb.png?branch=master)](http://travis-ci.org/michaelklishin/quartz-mongodb)
 
 CI is hosted by [Travis CI](http://travis-ci.org/)
+
+
+## Releasing
+
+Releases are published to [Maven Central](https://central.sonatype.com/) via the
+Sonatype Central Portal. The build (Gradle 6.5.1, JDK 11) produces a signed,
+upload-ready bundle and a GitHub Actions workflow performs the upload.
+
+### One-time setup
+
+* Verify the `io.github.unlocker` namespace on the Central Portal (must be done by
+  the owner of `github.com/Unlocker`).
+* Have a PGP key whose **public** part is published to a public keyserver
+  (e.g. `keyserver.ubuntu.com`); Central validates signatures against it.
+* Configure these **repository secrets** (Settings → Secrets and variables → Actions):
+
+  | Secret | Description |
+  | --- | --- |
+  | `SIGNING_KEY` | ASCII-armored PGP **secret** key (`gpg --armor --export-secret-keys <id>`) |
+  | `SIGNING_PASSWORD` | passphrase for that key (empty string if none) |
+  | `CENTRAL_USERNAME` | Central Portal **user token** name (Account → Generate User Token) |
+  | `CENTRAL_PASSWORD` | Central Portal **user token** secret |
+
+### Cutting a release
+
+1. Bump `projectVersion` in `gradle.properties` to the release version.
+2. Commit and tag (the project releases straight from `master`, unprefixed tags,
+   e.g. `2.1.1`):
+
+   ```
+   git commit -am "Release X.Y.Z"
+   git tag -a X.Y.Z -m "quartz-mongodb X.Y.Z"
+   git push origin master && git push origin X.Y.Z
+   ```
+3. Publishing the matching GitHub **Release** (or running the `Publish to Maven
+   Central` workflow manually) builds the signed bundle and uploads it. The
+   workflow uses `publishingType=USER_MANAGED`, so the deployment lands in a
+   staging state — review and **release** it in the Portal UI to push it live.
+
+### Build the bundle locally (optional)
+
+```
+SIGNING_KEY="$(gpg --armor --export-secret-keys <id>)" \
+SIGNING_PASSWORD='...' \
+JAVA_HOME=/path/to/jdk11 ./gradlew clean centralBundle
+# -> build/distributions/central-bundle-<version>.zip
+```
+
+Then upload `central-bundle-<version>.zip` manually via the Central Portal UI, or
+with the same `curl` call the workflow uses.
 
 
 ## Copyright & License
